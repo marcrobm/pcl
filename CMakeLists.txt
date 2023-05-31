@@ -1,6 +1,14 @@
 ### ---[ PCL global CMake
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
 if(POLICY CMP0074)
   # 1. Remove with 3.12.4.
   # 2. Remove search paths with *_ROOT since they will be automatically checked
@@ -145,7 +153,7 @@ endif()
 
 if(CMAKE_COMPILER_IS_MSVC)
   add_definitions("-DBOOST_ALL_NO_LIB -D_SCL_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX -DPCL_ONLY_CORE_POINT_TYPES ${SSE_DEFINITIONS}")
-  
+
   if("${CMAKE_CXX_FLAGS}" STREQUAL "${CMAKE_CXX_FLAGS_DEFAULT}")
     string(APPEND CMAKE_CXX_FLAGS " /fp:precise ${SSE_FLAGS} ${AVX_FLAGS}")
 
@@ -156,7 +164,7 @@ if(CMAKE_COMPILER_IS_MSVC)
       string(APPEND CMAKE_EXE_LINKER_FLAGS_RELEASE " /LTCG")
     else()
       set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=/bigobj")
-      
+
       message("Global optimizations /GL has been turned off, as it doesn't work with nvcc/thrust")
     endif()
     # /MANIFEST:NO") # please, don't disable manifest generation, otherwise crash at start for vs2008
@@ -191,8 +199,8 @@ if(CMAKE_COMPILER_IS_MSVC)
       elseif(MSVC_MP GREATER 1)
         string(APPEND CMAKE_C_FLAGS " /MP${MSVC_MP}")
         string(APPEND CMAKE_CXX_FLAGS " /MP${MSVC_MP}")
-      endif()      
-    else()      
+      endif()
+    else()
       if(MSVC_MP EQUAL 0)
         # MSVC_MP is 0 in case the information cannot be determined by ProcessorCount => fallback
         # Generator expression is necessary to limit /MP flag to C/CXX, so flag will be not set to e.g. CUDA (see https://gitlab.kitware.com/cmake/cmake/issues/17535)
@@ -276,8 +284,6 @@ else()
 endif()
 configure_file("${PCL_SOURCE_DIR}/cmake/uninstall_target.cmake.in"
                "${PCL_BINARY_DIR}/uninstall_target.cmake" IMMEDIATE @ONLY)
-add_custom_target(${UNINSTALL_TARGET_NAME} "${CMAKE_COMMAND}" -P
-                  "${PCL_BINARY_DIR}/uninstall_target.cmake")
 
 ###
 # this is copy paste form http://www.itk.org/Wiki/CMake_RPATH_handling
@@ -319,14 +325,20 @@ endif()
 find_package(Threads REQUIRED)
 
 # Eigen (required)
-find_package(Eigen 3.3 REQUIRED)
+set(Eigen_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../eigen/build/out/share/eigen3/cmake)
+set(EIGEN_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../eigen)
+find_package(Eigen REQUIRED)
 include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 
+# lz4
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../lz4/build/cmake dependencies/lz4/build/cmake)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lz4/lib)
+set(LZ4_LINK_LIBRARIES lz4_static)
 # FLANN (required)
-find_package(FLANN 1.9.1 REQUIRED)
-if(NOT (${FLANN_LIBRARY_TYPE} MATCHES ${PCL_FLANN_REQUIRED_TYPE}) AND NOT (${PCL_FLANN_REQUIRED_TYPE} MATCHES "DONTCARE"))
-  message(FATAL_ERROR "Flann was selected with ${PCL_FLANN_REQUIRED_TYPE} but found as ${FLANN_LIBRARY_TYPE}")
-endif()
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../flann dependencies/flann)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../flann/src/cpp)
+set(FLANN_FOUND TRUE)
+
 
 # libusb
 option(WITH_LIBUSB "Build USB RGBD-Camera drivers" TRUE)
@@ -381,19 +393,6 @@ if(WITH_CUDA)
   include("${PCL_SOURCE_DIR}/cmake/pcl_find_cuda.cmake")
 endif()
 
-
-# Reset VTK_FOUND to off
-set(VTK_FOUND OFF)
-# Find VTK - VTK has to be found before Qt, otherwise it can overwrite Qt variables
-option(WITH_VTK "Build VTK-Visualizations" TRUE)
-if(WITH_VTK)
-  if(ANDROID)
-    message(WARNING "VTK is not supported on Android.")
-  else()
-    include("${PCL_SOURCE_DIR}/cmake/pcl_find_vtk.cmake")
-  endif()
-endif()
-
 # VTK can depend on Qt and search for its required version, so search after so we can overwrite Qt5_FOUND/Qt6_FOUND if the version we require is not found.
 set(WITH_QT "AUTO" CACHE STRING "Build QT Front-End (AUTO|YES|QT6|QT5|NO)")
 set_property(CACHE WITH_QT PROPERTY STRINGS "AUTO" "YES" "QT6" "QT5" "NO")
@@ -408,13 +407,22 @@ if(WITH_PCAP)
 endif()
 
 # OpenGL and GLUT
-option(WITH_OPENGL "Support for OpenGL" TRUE)
+option(WITH_OPENGL "Support for OpenGL" FALSE)
 if(WITH_OPENGL)
   include("${PCL_SOURCE_DIR}/cmake/pcl_find_gl.cmake")
 endif()
 
 # Boost (required)
-include("${PCL_SOURCE_DIR}/cmake/pcl_find_boost.cmake")
+#include("${PCL_SOURCE_DIR}/cmake/pcl_find_boost.cmake")
+add_library(boost STATIC IMPORTED)
+# collect boost sources 
+set(Boost_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../boost-android/build/out/${ANDROID_ABI}/lib)
+file(GLOB Boost_LIBRARIES ${Boost_LIB_DIR}/*.a)
+set_target_properties(boost PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../boost-android/build/out/${ANDROID_ABI}/)
+set(BOOST_FOUND TRUE)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../boost-android/build/out/${ANDROID_ABI}/include/boost-1_82/ )
+
+#TODO: find boost
 
 ### ---[ Create the config.h file
 set(pcl_config_h_in "${CMAKE_CURRENT_SOURCE_DIR}/pcl_config.h.in")
