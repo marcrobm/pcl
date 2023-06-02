@@ -42,7 +42,9 @@ if(TARGET QHULL::QHULL)
 endif()
 
 # Try to locate QHull using modern cmake config (available on latest Qhull version).
-find_package(Qhull CONFIG QUIET)
+set(Qhull_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../qhull/build_android/out/${ANDROID_ABI}/lib/cmake/Qhull")
+message(STATUS "Qhull_DIR: ${Qhull_DIR}")
+find_package(Qhull CONFIG REQUIRED)
 
 if(Qhull_FOUND)
   unset(Qhull_FOUND)

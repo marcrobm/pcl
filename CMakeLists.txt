@@ -380,11 +380,9 @@ endif()
 
 # Qhull
 option(WITH_QHULL "Include convex-hull operations" TRUE)
-if(WITH_QHULL)
-  find_package(Qhull)
-  if(NOT (${QHULL_LIBRARY_TYPE} MATCHES ${PCL_QHULL_REQUIRED_TYPE}) AND NOT (${PCL_QHULL_REQUIRED_TYPE} MATCHES "DONTCARE"))
+include("${PCL_SOURCE_DIR}/cmake/Modules/FindQhull.cmake")
+if(NOT (${QHULL_LIBRARY_TYPE} MATCHES ${PCL_QHULL_REQUIRED_TYPE}) AND NOT (${PCL_QHULL_REQUIRED_TYPE} MATCHES "DONTCARE"))
     message(FATAL_ERROR "Qhull was selected with ${PCL_QHULL_REQUIRED_TYPE} but found as ${QHULL_LIBRARY_TYPE}")
-  endif()
 endif()
 
 # Cuda
